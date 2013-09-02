@@ -8,6 +8,12 @@
 
 #import "DNURLConnection.h"
 
+// Private hack stuff, because the Videro Server has a wrong certificate
+@interface NSURLRequest (DummyInterface)
++ (BOOL)allowsAnyHTTPSCertificateForHost:(NSString*)host;
++ (void)setAllowsAnyHTTPSCertificate:(BOOL)allow forHost:(NSString*)host;
+@end
+
 @implementation DNURLConnection
 
 + (id)connectionWithRequest:(NSURLRequest*)request
@@ -20,6 +26,18 @@
     completionHandler:(void (^)(NSURLResponse*, NSData*, NSError*))handler
 {
     self = [super init];
+    
+    [NSURLRequest setAllowsAnyHTTPSCertificate:YES forHost:[request.URL host]];
+    
+#ifdef USE_HTTP_AUTH
+    NSMutableURLRequest *theRequest = [request mutableCopy];
+    NSString *authStr = [NSString stringWithFormat:@"%@:%@", SERVER_HOST_USER, SERVER_HOST_PASSWORD];
+    NSData *authData = [authStr dataUsingEncoding:NSASCIIStringEncoding];
+    NSString *authValue = [NSString stringWithFormat:@"Basic %@", [authData base64EncodedStringWithWrapWidth:80]];
+    [theRequest setValue:authValue forHTTPHeaderField:@"Authorization"];
+    request = [theRequest copy];
+#endif
+    
     if (self)
     {
         _handler    = handler;
